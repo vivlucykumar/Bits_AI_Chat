@@ -8,6 +8,8 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_community.llms.huggingface_hub import HuggingFaceHub
 from langchain_community.embeddings import HuggingFaceInstructEmbeddings
+from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
+
 
 
 
@@ -98,7 +100,7 @@ def load_and_process_pdfs():
 
         # Use a robust embedding model from Hugging Face
         llm = HuggingFaceHub(repo_id="your-model-repo")
-        embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
         # Create and save the FAISS vector store
         vectorstore = FAISS.from_documents(documents=all_chunks, embedding=embeddings)
