@@ -8,7 +8,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_community.llms.huggingface_hub import HuggingFaceHub
 from langchain_community.embeddings import HuggingFaceInstructEmbeddings
-from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
 
 
 
@@ -100,7 +100,10 @@ def load_and_process_pdfs():
 
         # Use a robust embedding model from Hugging Face
         llm = HuggingFaceHub(repo_id="your-model-repo")
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        # llm = HuggingFaceEndpoint(repo_id="your-model-repo")
+        # embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+
 
         # Create and save the FAISS vector store
         vectorstore = FAISS.from_documents(documents=all_chunks, embedding=embeddings)
@@ -125,7 +128,16 @@ def get_qa_chain():
         model_kwargs={"temperature": 0.7, "max_new_tokens": 1024},
         huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN
     )
+    # llm = HuggingFaceEndpoint(
+    # repo_id="mistralai/Mistral-7B-Instruct-v0.2",
+    # model_kwargs={
+    #     "temperature": 0.7,
+    #     "max_new_tokens": 1024,
+    # },
+    huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN
+    # )
 
+    # embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
 
     if os.path.exists(VECTORSTORE_DIR):
