@@ -3,28 +3,16 @@ import os
 import base64
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import OllamaEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
-from langchain_community.llms.huggingface_hub import HuggingFaceHub
-from langchain_community.embeddings import HuggingFaceInstructEmbeddings
-# from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
-
-
-
-
-
-
-
+from langchain_community.llms import Ollama
 
 # --- CONFIGURATION ---
-# Set your Hugging Face API token here. Best practice is to use Streamlit secrets.
-# For local testing, you can set it as an environment variable.
-HUGGINGFACEHUB_API_TOKEN = st.secrets.get("HUGGINGFACEHUB_API_TOKEN", os.environ.get("HUGGINGFACEHUB_API_TOKEN"))
-
 # Define paths
 PDF_DIR = "data/pdfs"
-VECTORSTORE_DIR = "faiss_index"
+VECTORSTORE_DIR = "chroma_db"
 LOGO_PATH = "assets/bits.png"
 
 # --- HELPER FUNCTIONS ---
@@ -68,7 +56,7 @@ def set_background_logo(png_file):
 def load_and_process_pdfs():
     """
     Loads PDFs from the specified directory, splits them into chunks,
-    and creates a FAISS vector store with Hugging Face embeddings.
+    and creates a Chroma vector store with Ollama embeddings.
     This function is cached to avoid reprocessing on every run.
     """
     if not os.path.exists(PDF_DIR) or not any(f.endswith('.pdf') for f in os.listdir(PDF_DIR)):
@@ -95,20 +83,19 @@ def load_and_process_pdfs():
             st.error("Failed to process any documents. The vector store cannot be created.")
             return None
         
-       
-
-
-        # Use a robust embedding model from Hugging Face
-        llm = HuggingFaceHub(repo_id="your-model-repo")
-        # llm = HuggingFaceEndpoint(repo_id="your-model-repo")
-        # embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-
-
-        # Create and save the FAISS vector store
-        vectorstore = FAISS.from_documents(documents=all_chunks, embedding=embeddings)
-        os.makedirs(VECTORSTORE_DIR, exist_ok=True)
-        vectorstore.save_local(VECTORSTORE_DIR)
+        # Use a robust embedding model from Ollama
+        embeddings = OllamaEmbeddings(model="llama3")
+        
+        # Create and save the Chroma vector store
+        # The persist_directory parameter saves the vector store to disk
+        vectorstore = Chroma.from_documents(
+            documents=all_chunks,
+            embedding=embeddings,
+            persist_directory=VECTORSTORE_DIR
+        )
+        
+        # We need to explicitly persist the database
+        vectorstore.persist()
 
     return vectorstore
 
@@ -118,31 +105,18 @@ def get_qa_chain():
     Initializes and returns the QA chain. It loads the vector store from disk if it exists,
     otherwise it creates it by processing the PDFs.
     """
-    if not HUGGINGFACEHUB_API_TOKEN:
-        st.error("Hugging Face API token is not set. Please add it to your Streamlit secrets.")
+    # Use Ollama for both embeddings and the language model
+    try:
+        llm = Ollama(model="llama3")  # Ensure this model is pulled in your local Ollama setup
+    except Exception as e:
+        st.error(f"Could not connect to Ollama. Make sure Ollama is running and the model is pulled. Error: {e}")
         st.stop()
-
-    # Use a powerful and compatible model from Hugging Face Hub
-    llm = HuggingFaceHub(
-        repo_id="mistralai/Mistral-7B-Instruct-v0.2",
-        model_kwargs={"temperature": 0.7, "max_new_tokens": 1024},
-        huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN
-    )
-    # llm = HuggingFaceEndpoint(
-    # repo_id="mistralai/Mistral-7B-Instruct-v0.2",
-    # model_kwargs={
-    #     "temperature": 0.7,
-    #     "max_new_tokens": 1024,
-    # },
-    huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN
-    # )
-
-    # embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-
+    
+    embeddings = OllamaEmbeddings(model="llama3")
+    
     if os.path.exists(VECTORSTORE_DIR):
         # Load existing vector store
-        vectorstore = FAISS.load_local(VECTORSTORE_DIR, embeddings, allow_dangerous_deserialization=True)
+        vectorstore = Chroma(persist_directory=VECTORSTORE_DIR, embedding_function=embeddings)
     else:
         # Create it if it doesn't exist
         with st.spinner("First-time setup: Building vector store from PDFs..."):
@@ -207,8 +181,8 @@ def login_page():
 # --- MAIN CHAT INTERFACE ---
 def chat_interface():
     """ The main chat interface of the application. """
-    st.title("📚 AI Document Assistant")
-    st.write("Ask me any question about the content of your uploaded PDF documents.")
+    st.title("📚 AI Document Assistant By Vivek Kumar")
+    st.write("Ask me any question related to subjects in the MBA in AI 1st Sem....")
     st.caption(f"Logged in as: {st.session_state.user_email}")
 
     # Initialize chat history
